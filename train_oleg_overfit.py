@@ -50,6 +50,22 @@ argparser.add_argument(
     default='model_data/figure_classes.txt')
 
 
+def get_detector_mask(boxes, anchors):
+    '''
+    Precompute detectors_mask and matching_true_boxes for training.
+    Detectors mask is 1 for each spatial position in the final conv layer and
+    anchor that should be active for the given boxes and 0 otherwise.
+    Matching true boxes gives the regression targets for the ground truth box
+    that caused a detector to be active or 0 otherwise.
+    '''
+    detectors_mask = [0 for i in range(len(boxes))]
+    matching_true_boxes = [0 for i in range(len(boxes))]
+    for i, box in enumerate(boxes):
+        detectors_mask[i], matching_true_boxes[i] = preprocess_true_boxes(box, anchors, [416, 416])
+
+    return np.array(detectors_mask), np.array(matching_true_boxes)
+
+
 def _main(args):
     voc_path = os.path.expanduser(args.data_path)
     classes_path = os.path.expanduser(args.classes_path)
@@ -67,32 +83,36 @@ def _main(args):
     else:
         anchors = YOLO_ANCHORS
 
-    images = [Image.open("train_examples/1.jpg"),
-              Image.open("train_examples/2.jpg"),
-              Image.open("train_examples/3.jpg")]
-    orig_size = np.array([image.width, image.height])
-    orig_size = np.expand_dims(orig_size, axis=0)
+    images = [Image.open("train_examples/1.jpg")]
+    orig_size_saved = np.array([images[0].width, images[0].height])
+    orig_size = np.expand_dims(orig_size_saved, axis=0)
+    orig_size = np.expand_dims(orig_size, axis=0) #TODO fix it should be one statement
 
-    # Image preprocessing.
-    image = image.resize((416, 416), PIL.Image.BICUBIC)
-    image_data = np.array(image, dtype=np.float)
-    image_data /= 255.
+    # Images preprocessing.
+    image_data = []
+    for i in range(len(images)):
+        resized = images[i].resize((416, 416), PIL.Image.BICUBIC)
+        resized = np.array(resized, dtype=np.float)
+        image_data.append(resized / 255)
+    image_data = np.array(image_data)
 
     # Box preprocessing.
     # Original boxes stored as 1D list of class, x_min, y_min, x_max, y_max.
     #[ 14 209 187 228 230  14 242 182 274 259  14 269 188 295 259]
-    boxes = np.array([0, 226, 128, 343, 243])
-    boxes = boxes.reshape((-1, 5))
+    boxes = np.array(
+        [
+            [[0, 226, 128, 343, 243], [1, 23, 355, 135, 467]]
+        ])
     # Get extents as y_min, x_min, y_max, x_max, class for comparision with
     # model output.
-    boxes_extents = boxes[:, [2, 1, 4, 3, 0]]
+    boxes_extents = boxes #just for printing
 
     # Get box parameters as x_center, y_center, box_width, box_height, class.
-    boxes_xy = 0.5 * (boxes[:, 3:5] + boxes[:, 1:3])
-    boxes_wh = boxes[:, 3:5] - boxes[:, 1:3]
+    boxes_xy = 0.5 * (boxes[:, :, 3:5] + boxes[:, :, 1:3])
+    boxes_wh = boxes[:, :, 3:5] - boxes[:, :, 1:3]
     boxes_xy = boxes_xy / orig_size
     boxes_wh = boxes_wh / orig_size
-    boxes = np.concatenate((boxes_xy, boxes_wh, boxes[:, 0:1]), axis=1)
+    boxes = np.concatenate((boxes_xy, boxes_wh, boxes[:, :, 0:1]), axis=2)
 
     # Precompute detectors_mask and matching_true_boxes for training.
     # Detectors mask is 1 for each spatial position in the final conv layer and
@@ -101,8 +121,8 @@ def _main(args):
     # that caused a detector to be active or 0 otherwise.
     detectors_mask_shape = (13, 13, 5, 1)
     matching_boxes_shape = (13, 13, 5, 5)
-    detectors_mask, matching_true_boxes = preprocess_true_boxes(boxes, anchors,
-                                                                [416, 416])
+
+    detectors_mask, matching_true_boxes = get_detector_mask(boxes, anchors)
 
     # Create model input layers.
     image_input = Input(shape=(416, 416, 3))
@@ -143,10 +163,10 @@ def _main(args):
         })  # This is a hack to use the custom loss function in the last layer.
 
     # Add batch dimension for training.
-    image_data = np.expand_dims(image_data, axis=0)
-    boxes = np.expand_dims(boxes, axis=0)
-    detectors_mask = np.expand_dims(detectors_mask, axis=0)
-    matching_true_boxes = np.expand_dims(matching_true_boxes, axis=0)
+    #image_data = np.expand_dims(image_data, axis=0)
+    #boxes = np.expand_dims(boxes, axis=0)
+    #detectors_mask = np.expand_dims(detectors_mask, axis=0)
+    #matching_true_boxes = np.expand_dims(matching_true_boxes, axis=0)
 
     num_steps = 1000
     # TODO: For full training, put preprocessing inside training loop.
@@ -172,7 +192,7 @@ def _main(args):
         [boxes, scores, classes],
         feed_dict={
             model_body.input: image_data,
-            input_image_shape: [image.size[1], image.size[0]],
+            input_image_shape: [416, 416],
             K.learning_phase(): 0
         })
     print('Found {} boxes for image.'.format(len(out_boxes)))
