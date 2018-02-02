@@ -10,7 +10,12 @@ YOLO_ANCHORS = np.array(
 
 
 def load_images():
-    images = [Image.open("train_examples/1.jpg")]
+    images = [
+        Image.open("train_examples/1.jpg"),
+        Image.open("train_examples/2.jpg"),
+        Image.open("train_examples/3.jpg"),
+        Image.open("train_examples/4.jpg")
+    ]
     orig_size_saved = np.array([images[0].width, images[0].height])
     orig_size = np.expand_dims(orig_size_saved, axis=0)
     orig_size = np.expand_dims(orig_size, axis=0) #TODO fix it should be one statement
@@ -30,7 +35,10 @@ def get_boxes(orig_size):
     # Original boxes stored as 1D list of class, x_min, y_min, x_max, y_max.
     boxes = np.array(
         [
-            [[0, 226, 128, 343, 243], [1, 23, 355, 135, 467]]
+            [[0, 226, 128, 343, 243], [1, 23, 355, 135, 467]],
+            [[1, 56, 117, 157, 215], [0, 225, 127], [2, 190, 320, 313, 440]],
+            [[0, 36, 35, 158, 153], [2, 196, 169, 318, 290], [1, 372, 47, 474, 145]],
+            [[0, 286, 137, 409, 254], [1, 140, 295, 241, 394], [2, 410, 367, 540, 493]],
         ])
     # Get extents as y_min, x_min, y_max, x_max, class for comparision with
     # model output.
