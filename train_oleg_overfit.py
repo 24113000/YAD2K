@@ -21,98 +21,15 @@ from PIL import Image, ImageDraw, ImageFont
 from yad2k.models.keras_yolo import (preprocess_true_boxes, yolo_body,
                                      yolo_eval, yolo_head, yolo_loss)
 from yad2k.utils.draw_boxes import draw_boxes
-
-IMAGE_INDEX = 15
-
-YOLO_ANCHORS = np.array(
-    ((0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434),
-     (7.88282, 3.52778), (9.77052, 9.16828)))
-
-argparser = argparse.ArgumentParser(
-    description='Train YOLO_v2 model to overfit on a single image.')
-
-argparser.add_argument(
-    '-d',
-    '--data_path',
-    help='path to HDF5 file containing pascal voc dataset',
-    default='F:\\workspace\\python\\oleg_project\\dataset\\VOCdevkit\\pascal_voc_07_12.hdf5')
-
-argparser.add_argument(
-    '-a',
-    '--anchors_path',
-    help='path to anchors file, defaults to yolo_anchors.txt',
-    default='model_data/yolo_anchors.txt')
-
-argparser.add_argument(
-    '-c',
-    '--classes_path',
-    help='path to classes file, defaults to pascal_classes.txt',
-    default='model_data/figure_classes.txt')
+from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
 
 
-def get_detector_mask(boxes, anchors):
-    '''
-    Precompute detectors_mask and matching_true_boxes for training.
-    Detectors mask is 1 for each spatial position in the final conv layer and
-    anchor that should be active for the given boxes and 0 otherwise.
-    Matching true boxes gives the regression targets for the ground truth box
-    that caused a detector to be active or 0 otherwise.
-    '''
-    detectors_mask = [0 for i in range(len(boxes))]
-    matching_true_boxes = [0 for i in range(len(boxes))]
-    for i, box in enumerate(boxes):
-        detectors_mask[i], matching_true_boxes[i] = preprocess_true_boxes(box, anchors, [416, 416])
+def _main():
 
-    return np.array(detectors_mask), np.array(matching_true_boxes)
-
-
-def _main(args):
-    voc_path = os.path.expanduser(args.data_path)
-    classes_path = os.path.expanduser(args.classes_path)
-    anchors_path = os.path.expanduser(args.anchors_path)
-
-    with open(classes_path) as f:
-        class_names = f.readlines()
-    class_names = [c.strip() for c in class_names]
-
-    if os.path.isfile(anchors_path):
-        with open(anchors_path) as f:
-            anchors = f.readline()
-            anchors = [float(x) for x in anchors.split(',')]
-            anchors = np.array(anchors).reshape(-1, 2)
-    else:
-        anchors = YOLO_ANCHORS
-
-    images = [Image.open("train_examples/1.jpg")]
-    orig_size_saved = np.array([images[0].width, images[0].height])
-    orig_size = np.expand_dims(orig_size_saved, axis=0)
-    orig_size = np.expand_dims(orig_size, axis=0) #TODO fix it should be one statement
-
-    # Images preprocessing.
-    image_data = []
-    for i in range(len(images)):
-        resized = images[i].resize((416, 416), PIL.Image.BICUBIC)
-        resized = np.array(resized, dtype=np.float)
-        image_data.append(resized / 255)
-    image_data = np.array(image_data)
-
-    # Box preprocessing.
-    # Original boxes stored as 1D list of class, x_min, y_min, x_max, y_max.
-    #[ 14 209 187 228 230  14 242 182 274 259  14 269 188 295 259]
-    boxes = np.array(
-        [
-            [[0, 226, 128, 343, 243], [1, 23, 355, 135, 467]]
-        ])
-    # Get extents as y_min, x_min, y_max, x_max, class for comparision with
-    # model output.
-    boxes_extents = boxes #just for printing
-
-    # Get box parameters as x_center, y_center, box_width, box_height, class.
-    boxes_xy = 0.5 * (boxes[:, :, 3:5] + boxes[:, :, 1:3])
-    boxes_wh = boxes[:, :, 3:5] - boxes[:, :, 1:3]
-    boxes_xy = boxes_xy / orig_size
-    boxes_wh = boxes_wh / orig_size
-    boxes = np.concatenate((boxes_xy, boxes_wh, boxes[:, :, 0:1]), axis=2)
+    anchors = YOLO_ANCHORS
+    class_names = get_classes()
+    image_data, orig_size = load_images()
+    boxes, orig_boxes = get_boxes(orig_size)
 
     # Precompute detectors_mask and matching_true_boxes for training.
     # Detectors mask is 1 for each spatial position in the final conv layer and
@@ -133,7 +50,7 @@ def _main(args):
     print('Boxes:')
     print(boxes)
     print('Box corners:')
-    print(boxes_extents)
+    print(orig_boxes)
     print('Active detectors:')
     print(np.where(detectors_mask == 1)[:-1])
     print('Matching boxes for active detectors:')
@@ -162,12 +79,6 @@ def _main(args):
             'yolo_loss': lambda y_true, y_pred: y_pred
         })  # This is a hack to use the custom loss function in the last layer.
 
-    # Add batch dimension for training.
-    #image_data = np.expand_dims(image_data, axis=0)
-    #boxes = np.expand_dims(boxes, axis=0)
-    #detectors_mask = np.expand_dims(detectors_mask, axis=0)
-    #matching_true_boxes = np.expand_dims(matching_true_boxes, axis=0)
-
     num_steps = 1000
     # TODO: For full training, put preprocessing inside training loop.
     # for i in range(num_steps):
@@ -184,5 +95,4 @@ def _main(args):
 
 
 if __name__ == '__main__':
-    args = argparser.parse_args()
-    _main(args)
+    _main()

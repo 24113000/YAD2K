@@ -15,28 +15,44 @@ from PIL import Image, ImageDraw, ImageFont
 from yad2k.models.keras_yolo import (preprocess_true_boxes, yolo_body,
                                      yolo_eval, yolo_head, yolo_loss)
 from yad2k.utils.draw_boxes import draw_boxes
+from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
+
+OUT_PATH = "output_images"
+IMAGE_INDEX = 0
+WEIGHTS_NAME = "overfit_weights.h5"
 
 
-# Create output variables for prediction.
-yolo_outputs = yolo_head(model_body.output, anchors, len(class_names))
-input_image_shape = K.placeholder(shape=(2,))
-boxes, scores, classes = yolo_eval(
-    yolo_outputs, input_image_shape, score_threshold=.3, iou_threshold=.9)
+def _main():
+    class_names = get_classes()
+    image_data, orig_size = load_images()
 
-# Run prediction on overfit image.
-sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
-out_boxes, out_scores, out_classes = sess.run(
-    [boxes, scores, classes],
-    feed_dict={
-        model_body.input: image_data,
-        input_image_shape: [416, 416],
-        K.learning_phase(): 0
-    })
-print('Found {} boxes for image.'.format(len(out_boxes)))
-print(out_boxes)
+    image_input = Input(shape=(416, 416, 3))
+    model_body = yolo_body(image_input, len(YOLO_ANCHORS), len(class_names))
+    model_body = Model(image_input, model_body.output)
+    model_body.load_weights(WEIGHTS_NAME)
 
-# Plot image with predicted boxes.
-image_with_boxes = draw_boxes(image_data[0], out_boxes, out_classes,
-                              class_names, out_scores)
-plt.imshow(image_with_boxes, interpolation='nearest')
-plt.show()
+    # Create output variables for prediction.
+    yolo_outputs = yolo_head(model_body.output, YOLO_ANCHORS, len(class_names))
+    input_image_shape = K.placeholder(shape=(2,))
+    boxes, scores, classes = yolo_eval(yolo_outputs, input_image_shape, score_threshold=.3, iou_threshold=.9)
+
+    # Run prediction on overfit image.
+    sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
+    out_boxes, out_scores, out_classes = sess.run(
+        [boxes, scores, classes],
+        feed_dict={
+            model_body.input: image_data,
+            input_image_shape: [416, 416],
+            K.learning_phase(): 0
+        })
+    print('Found {} boxes for image.'.format(len(out_boxes)))
+    print(out_boxes)
+
+    # Save images
+    image_with_boxes = draw_boxes(image_data[IMAGE_INDEX], out_boxes, out_classes, class_names, out_scores)
+    result_image = PIL.Image.fromarray(image_with_boxes)
+    result_image.save(os.path.join(OUT_PATH, str(IMAGE_INDEX) + '.png'))
+
+
+if __name__ == '__main__':
+    _main()
