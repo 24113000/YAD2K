@@ -18,7 +18,7 @@ from yad2k.utils.draw_boxes import draw_boxes
 from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
 
 OUT_PATH = "output_images"
-IMAGE_INDEX = 0
+IMAGE_INDEX = 2
 WEIGHTS_NAME = "overfit_weights.h5"
 
 
@@ -38,10 +38,12 @@ def _main():
 
     # Run prediction on overfit image.
     sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
+    curr_image = image_data[IMAGE_INDEX]
+    curr_image = np.expand_dims(curr_image, axis=0)
     out_boxes, out_scores, out_classes = sess.run(
         [boxes, scores, classes],
         feed_dict={
-            model_body.input: image_data,
+            model_body.input: curr_image,
             input_image_shape: [416, 416],
             K.learning_phase(): 0
         })
@@ -49,7 +51,7 @@ def _main():
     print(out_boxes)
 
     # Save images
-    image_with_boxes = draw_boxes(image_data[IMAGE_INDEX], out_boxes, out_classes, class_names, out_scores)
+    image_with_boxes = draw_boxes(curr_image[0], out_boxes, out_classes, class_names, out_scores)
     result_image = PIL.Image.fromarray(image_with_boxes)
     result_image.save(os.path.join(OUT_PATH, str(IMAGE_INDEX) + '.png'))
 

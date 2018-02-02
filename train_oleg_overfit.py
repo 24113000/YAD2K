@@ -23,6 +23,7 @@ from yad2k.models.keras_yolo import (preprocess_true_boxes, yolo_body,
 from yad2k.utils.draw_boxes import draw_boxes
 from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
 
+EPOH = 3000
 
 def _main():
 
@@ -79,7 +80,7 @@ def _main():
             'yolo_loss': lambda y_true, y_pred: y_pred
         })  # This is a hack to use the custom loss function in the last layer.
 
-    num_steps = 1000
+    num_steps = EPOH
     # TODO: For full training, put preprocessing inside training loop.
     # for i in range(num_steps):
     #     loss = model.train_on_batch(
