@@ -23,7 +23,8 @@ from yad2k.models.keras_yolo import (preprocess_true_boxes, yolo_body,
 from yad2k.utils.draw_boxes import draw_boxes
 from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
 
-EPOH = 3000
+EPOH = 3150
+
 
 def _main():
 

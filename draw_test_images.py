@@ -18,7 +18,7 @@ from yad2k.utils.draw_boxes import draw_boxes
 from common_functions import load_images, get_boxes, get_detector_mask, get_classes, YOLO_ANCHORS
 
 OUT_PATH = "output_images"
-IMAGE_INDEX = 2
+IMAGE_INDEX = 1
 WEIGHTS_NAME = "overfit_weights.h5"
 
 
@@ -53,7 +53,7 @@ def _main():
     # Save images
     image_with_boxes = draw_boxes(curr_image[0], out_boxes, out_classes, class_names, out_scores)
     result_image = PIL.Image.fromarray(image_with_boxes)
-    result_image.save(os.path.join(OUT_PATH, str(IMAGE_INDEX) + '.png'))
+    result_image.save(os.path.join(OUT_PATH, str(IMAGE_INDEX) + 'c.png'))
 
 
 if __name__ == '__main__':
